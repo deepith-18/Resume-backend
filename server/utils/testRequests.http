@@ -1,0 +1,33 @@
+### Resume Screener API — Test Requests
+### Use with VS Code REST Client extension or similar
+
+@baseUrl = http://localhost:5000/api
+
+### Health check
+GET {{baseUrl}}/health
+
+### List all resumes
+GET {{baseUrl}}/resume
+
+### Upload a resume (use a real PDF/DOCX file)
+# POST {{baseUrl}}/resume/upload
+# Content-Type: multipart/form-data; boundary=----boundary
+# ------boundary
+# Content-Disposition: form-data; name="resume"; filename="test.pdf"
+# Content-Type: application/pdf
+# < ./test-resume.pdf
+# ------boundary--
+
+### Analyze a specific resume (replace with real ID)
+POST {{baseUrl}}/resume/analyze/REPLACE_WITH_RESUME_ID
+Content-Type: application/json
+
+### Get resume details
+GET {{baseUrl}}/resume/REPLACE_WITH_RESUME_ID
+
+### Get job recommendations
+POST {{baseUrl}}/jobs/recommend/REPLACE_WITH_RESUME_ID
+Content-Type: application/json
+
+### Get stored recommendations
+GET {{baseUrl}}/jobs/REPLACE_WITH_RESUME_ID
