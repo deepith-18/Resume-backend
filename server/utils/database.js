@@ -1,48 +1,41 @@
-/**
- * utils/database.js — MongoDB connection with retry logic
- */
-
 const mongoose = require('mongoose');
 
 const connectDB = async () => {
-  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/resume_screener';
-
   try {
-    const conn = await mongoose.connect(uri, {
-      // Modern mongoose doesn't need these options but they prevent deprecation warnings
-      serverSelectionTimeoutMS: 5000,
+    if (!process.env.MONGO_URI) {
+      throw new Error("MONGO_URI is not defined");
+    }
+
+    console.log("🔎 Connecting to:", process.env.MONGO_URI);
+
+    const conn = await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
     });
 
     console.log(`✅ MongoDB connected: ${conn.connection.host}`);
 
-    // Handle connection events
     mongoose.connection.on('error', (err) => {
-      console.error('MongoDB connection error:', err);
+      console.error('MongoDB error:', err);
     });
 
     mongoose.connection.on('disconnected', () => {
-      console.warn('⚠️  MongoDB disconnected. Attempting reconnect...');
+      console.warn('⚠️ MongoDB disconnected');
     });
 
     mongoose.connection.on('reconnected', () => {
       console.log('✅ MongoDB reconnected');
     });
 
-    // Graceful shutdown
     process.on('SIGINT', async () => {
       await mongoose.connection.close();
-      console.log('MongoDB connection closed (app termination)');
+      console.log('MongoDB connection closed');
       process.exit(0);
     });
 
   } catch (error) {
     console.error('❌ MongoDB connection failed:', error.message);
-    // Don't exit immediately in development — allow retry
-    if (process.env.NODE_ENV === 'production') {
-      process.exit(1);
-    }
-    throw error;
+    process.exit(1); // Always exit in production
   }
 };
 
