@@ -1,6 +1,6 @@
 /**
  * controllers/jobController.js
- * Final Corrected Version - Handles mixed skill formats & safety checks
+ * Final Corrected Version - Includes Auto-Extraction & Robust Normalization
  */
 
 const asyncHandler = require('express-async-handler');
@@ -16,11 +16,13 @@ const { AppError } = require('../utils/errorHandler');
 const getJobRecommendations = asyncHandler(async (req, res) => {
   const { resumeId } = req.params;
 
+  // 1. Fetch Resume
   const resume = await Resume.findById(resumeId);
   if (!resume) {
     throw new AppError('Resume not found', 404);
   }
 
+  // 2. Status Check
   if (resume.analysisStatus !== 'completed') {
     throw new AppError(
       `Resume is not yet analyzed. Current status: ${resume.analysisStatus}`,
@@ -28,36 +30,59 @@ const getJobRecommendations = asyncHandler(async (req, res) => {
     );
   }
 
-  // ─── 🔥 CRITICAL FIX: SKILL FORMATTING & NORMALIZATION ──────────────────────
+  // ─── 🔥 SKILL EXTRACTION & AUTO-RECOVERY ─────────────────────────────────────
   let rawSkills = resume.parsedData?.skills || [];
 
+  // ✅ FORCE SKILL EXTRACTION FROM TEXT IF EMPTY
   if (rawSkills.length === 0) {
-    throw new AppError('Resume has no extracted skills. Re-analyze the resume first.', 400);
+    const text = resume.parsedData?.rawText || "";
+    console.log("⚠️ No skills found in parsedData. Attempting auto-extraction from rawText...");
+
+    const COMMON_SKILLS = [
+      "react", "node", "express", "mongodb", "javascript",
+      "python", "java", "sql", "html", "css", "tailwind",
+      "machine learning", "deep learning", "nlp", "typescript",
+      "aws", "docker", "kubernetes", "flutter", "swift"
+    ];
+
+    const foundSkills = COMMON_SKILLS.filter(skill =>
+      text.toLowerCase().includes(skill)
+    );
+
+    // Map found strings to the expected object format
+    rawSkills = foundSkills.map(s => ({
+      name: s,
+      level: 70 // default confidence for recovered skills
+    }));
+
+    if (rawSkills.length > 0) {
+      console.log("🔥 AUTO-EXTRACTED SKILLS:", rawSkills);
+    }
   }
 
-  // ✅ THE REPLACEMENT BLOCK (Handles strings, objects, and nested keys)
+  // 3. Final Normalization (Handles strings, objects, and nested keys)
   const finalizedSkills = rawSkills.map(s => {
     if (typeof s === "string") {
       return { name: s.toLowerCase().trim(), level: 70 };
     }
 
     return {
-      // Safely check common keys returned by different AI parsers
+      // Safely check common keys returned by different AI parsers (name, skill, or value)
       name: (s.name || s.skill || s.value || "").toLowerCase().trim(),
       level: s.level || 70
     };
   }).filter(s => s.name !== "");
 
-  // ✅ SAFETY CHECK: Ensure we actually have data left
+  // ✅ SAFETY CHECK: Ensure we actually have data left after all attempts
   if (!finalizedSkills.length) {
-    console.log("❌ NO VALID SKILLS AFTER CLEANING:", rawSkills);
-    throw new AppError('No valid skills extracted from resume.', 400);
+    console.log("❌ NO VALID SKILLS AFTER CLEANING AND RECOVERY:", resume.parsedData?.rawText ? "Raw text existed" : "Raw text empty");
+    throw new AppError('No valid skills could be extracted. Please ensure the resume contains technical keywords.', 400);
   }
 
   console.log("✅ FINAL SKILLS PASSED TO MATCHER:", finalizedSkills);
   // ──────────────────────────────────────────────────────────────────────────────
 
-  // Check for existing recommendations (unless refresh=true is passed)
+  // 4. Cache Check (unless refresh=true)
   const existing = await JobMatch.findOne({ resumeId }).sort({ createdAt: -1 });
   if (existing && !req.query.refresh) {
     return res.json({
@@ -67,12 +92,11 @@ const getJobRecommendations = asyncHandler(async (req, res) => {
     });
   }
 
-  // Generate new recommendations
+  // 5. Generate Recommendations
   const recommendations = generateRoleMatches(finalizedSkills);
-  
   console.log("✅ MATCH RESULTS:", recommendations);
 
-  // Update or Create the JobMatch entry
+  // 6. Persistence (Upsert)
   const jobMatch = await JobMatch.findOneAndUpdate(
     { resumeId: resume._id },
     {
