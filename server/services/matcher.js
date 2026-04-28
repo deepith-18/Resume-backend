@@ -34,36 +34,56 @@ const ROLE_MAP = [
 ];
 
 /**
+ * Normalizes strings by removing non-alphabetic characters.
+ * Example: "Node.js" -> "nodejs", "React-Native" -> "reactnative"
+ */
+const normalize = (str) => str.toLowerCase().replace(/[^a-z]/g, '');
+
+/**
  * Generates matches by comparing user skills against the expanded role map
  */
 const generateRoleMatches = (skills) => {
-  // Ensure we have an array and extract names to lowercase
+  // Ensure we have an array and extract names
   const skillNames = (skills || []).map(s => (s.name || "").toLowerCase().trim());
 
   return ROLE_MAP.map(role => {
-    // Flexible matching: checks if any user skill contains the required role skill 
-    // or vice versa (e.g., "PostgreSQL" matches "sql")
+    // ✅ ROBUST MATCH LOGIC
+    // Compares normalized versions of skills to handle dots, dashes, and spaces
     const matched = role.skills.filter(reqSkill =>
-      skillNames.some(userSkill => 
-        userSkill.includes(reqSkill) || reqSkill.includes(userSkill)
+      skillNames.some(userSkill =>
+        normalize(userSkill).includes(normalize(reqSkill)) ||
+        normalize(reqSkill).includes(normalize(userSkill))
       )
     );
 
-    // Calculate score based on percentage of skills matched
-    const score = Math.round((matched.length / role.skills.length) * 100);
+    // ✅ REPLACEMENT SCORE LOGIC
+    // Linear scoring: 25 points per match to ensure visibility
+    const score = Math.min(matched.length * 25, 100);
 
     return {
       title: role.title,
-      matchScore: score,
+      matchScore: score, // Snake_case match for some components, camelCase for others
+      match_score: score, 
       matched_skills: matched,
       missing_skills: role.skills.filter(s => !matched.includes(s)),
+      reason: getReasonMessage(score)
     };
   })
-  // We keep any match with at least one skill found
+  // ✅ REMOVE STRICT FILTER (matchScore > 0)
   .filter(r => r.matchScore > 0) 
   .sort((a, b) => b.matchScore - a.matchScore)
   // Limit to top 6 most relevant roles
   .slice(0, 6);
 };
+
+/**
+ * Returns a human-readable label based on the calculated score.
+ */
+function getReasonMessage(score) {
+  if (score >= 75) return "Top Career Match";
+  if (score >= 50) return "Strong Potential";
+  if (score >= 25) return "Good Alternative";
+  return "Exploratory Match";
+}
 
 module.exports = { generateRoleMatches };
