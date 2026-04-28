@@ -1,12 +1,11 @@
 /**
  * controllers/jobController.js
- * Optimized Job Recommendation Controller
+ * Final Corrected Version - Handles mixed skill formats & safety checks
  */
 
 const asyncHandler = require('express-async-handler');
 const Resume = require('../models/Resume');
 const JobMatch = require('../models/Job');
-// ✅ FIX 2: Ensure this path matches your filename (e.g., matcher.js or matchingService.js)
 const { generateRoleMatches } = require('../services/matcher'); 
 const { AppError } = require('../utils/errorHandler');
 
@@ -17,13 +16,11 @@ const { AppError } = require('../utils/errorHandler');
 const getJobRecommendations = asyncHandler(async (req, res) => {
   const { resumeId } = req.params;
 
-  // Fetch resume
   const resume = await Resume.findById(resumeId);
   if (!resume) {
     throw new AppError('Resume not found', 404);
   }
 
-  // Must be analyzed first
   if (resume.analysisStatus !== 'completed') {
     throw new AppError(
       `Resume is not yet analyzed. Current status: ${resume.analysisStatus}`,
@@ -31,31 +28,36 @@ const getJobRecommendations = asyncHandler(async (req, res) => {
     );
   }
 
-  // ─── 🔥 CRITICAL FIX 1: SKILL FORMATTING ────────────────────────────────────
+  // ─── 🔥 CRITICAL FIX: SKILL FORMATTING & NORMALIZATION ──────────────────────
   let rawSkills = resume.parsedData?.skills || [];
 
   if (rawSkills.length === 0) {
     throw new AppError('Resume has no extracted skills. Re-analyze the resume first.', 400);
   }
 
-  // Convert string skills → object format if necessary
-  if (typeof rawSkills[0] === "string") {
-    rawSkills = rawSkills.map(s => ({
-      name: s,
-      level: 70 // default confidence
-    }));
-  }
+  // ✅ THE REPLACEMENT BLOCK (Handles strings, objects, and nested keys)
+  const finalizedSkills = rawSkills.map(s => {
+    if (typeof s === "string") {
+      return { name: s.toLowerCase().trim(), level: 70 };
+    }
 
-  // Final Normalization structure
-  const finalizedSkills = rawSkills.map(s => ({
-    name: (s.name || "").toLowerCase().trim(),
-    level: s.level || 70
-  }));
+    return {
+      // Safely check common keys returned by different AI parsers
+      name: (s.name || s.skill || s.value || "").toLowerCase().trim(),
+      level: s.level || 70
+    };
+  }).filter(s => s.name !== "");
+
+  // ✅ SAFETY CHECK: Ensure we actually have data left
+  if (!finalizedSkills.length) {
+    console.log("❌ NO VALID SKILLS AFTER CLEANING:", rawSkills);
+    throw new AppError('No valid skills extracted from resume.', 400);
+  }
 
   console.log("✅ FINAL SKILLS PASSED TO MATCHER:", finalizedSkills);
   // ──────────────────────────────────────────────────────────────────────────────
 
-  // Check for existing recommendations (don't regenerate unless forced via ?refresh=true)
+  // Check for existing recommendations (unless refresh=true is passed)
   const existing = await JobMatch.findOne({ resumeId }).sort({ createdAt: -1 });
   if (existing && !req.query.refresh) {
     return res.json({
@@ -65,13 +67,12 @@ const getJobRecommendations = asyncHandler(async (req, res) => {
     });
   }
 
-  // Generate new recommendations using our improved matching engine
+  // Generate new recommendations
   const recommendations = generateRoleMatches(finalizedSkills);
   
-  // ✅ DEBUG LOG
   console.log("✅ MATCH RESULTS:", recommendations);
 
-  // Save to DB (Upsert: Update existing or create new)
+  // Update or Create the JobMatch entry
   const jobMatch = await JobMatch.findOneAndUpdate(
     { resumeId: resume._id },
     {
@@ -80,9 +81,9 @@ const getJobRecommendations = asyncHandler(async (req, res) => {
       careerTrajectory: recommendations.length > 0 
         ? `Strongest alignment found in ${recommendations[0].title} roles.` 
         : "Generalist trajectory; consider specializing in a core framework.",
-      developmentAreas: recommendations.length > 0 
+      developmentAreas: (recommendations.length > 0 && recommendations[0].missing_skills.length > 0)
         ? recommendations[0].missing_skills 
-        : ["Core technical stack expansion"],
+        : ["Broadening technical stack expertise"],
       generatedAt: Date.now()
     },
     { upsert: true, new: true }
@@ -97,7 +98,7 @@ const getJobRecommendations = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/jobs/:resumeId
- * Retrieve stored job recommendations for a resume
+ * Retrieve stored job recommendations
  */
 const getStoredRecommendations = asyncHandler(async (req, res) => {
   const { resumeId } = req.params;
