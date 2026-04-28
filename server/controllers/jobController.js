@@ -1,6 +1,6 @@
 /**
  * controllers/jobController.js
- * Final Corrected Version - Includes Auto-Extraction & Robust Normalization
+ * Final Corrected Version - Tiered Extraction & Robust Normalization
  */
 
 const asyncHandler = require('express-async-handler');
@@ -30,59 +30,56 @@ const getJobRecommendations = asyncHandler(async (req, res) => {
     );
   }
 
-  // ─── 🔥 SKILL EXTRACTION & AUTO-RECOVERY ─────────────────────────────────────
-  let rawSkills = resume.parsedData?.skills || [];
+  // ─── 🔥 GUARANTEED SKILL EXTRACTION LOGIC ────────────────────────────────────
+  let finalizedSkills = [];
 
-  // ✅ FORCE SKILL EXTRACTION FROM TEXT IF EMPTY
-  if (rawSkills.length === 0) {
-    const text = resume.parsedData?.rawText || "";
-    console.log("⚠️ No skills found in parsedData. Attempting auto-extraction from rawText...");
+  // 1️⃣ Try parsedData.skills
+  if (resume.parsedData?.skills?.length) {
+    finalizedSkills = resume.parsedData.skills;
+  }
 
-    const COMMON_SKILLS = [
-      "react", "node", "express", "mongodb", "javascript",
-      "python", "java", "sql", "html", "css", "tailwind",
-      "machine learning", "deep learning", "nlp", "typescript",
-      "aws", "docker", "kubernetes", "flutter", "swift"
-    ];
+  // 2️⃣ Fallback: extract from rawText (THE REAL FIX)
+  if (!finalizedSkills.length) {
+    // Check both resume.rawText and resume.parsedData.rawText depending on your schema
+    const textToScan = (resume.rawText || resume.parsedData?.rawText || "").toLowerCase();
 
-    const foundSkills = COMMON_SKILLS.filter(skill =>
-      text.toLowerCase().includes(skill)
-    );
+    if (textToScan) {
+      const COMMON_SKILLS = [
+        "react", "node", "express", "mongodb", "javascript",
+        "python", "java", "sql", "html", "css", "tailwind",
+        "machine learning", "deep learning", "nlp", "typescript",
+        "aws", "docker", "kubernetes", "flutter", "swift"
+      ];
 
-    // Map found strings to the expected object format
-    rawSkills = foundSkills.map(s => ({
-      name: s,
-      level: 70 // default confidence for recovered skills
-    }));
+      finalizedSkills = COMMON_SKILLS
+        .filter(skill => textToScan.includes(skill))
+        .map(s => ({ name: s, level: 70 }));
 
-    if (rawSkills.length > 0) {
-      console.log("🔥 AUTO-EXTRACTED SKILLS:", rawSkills);
+      console.log("🔥 FALLBACK SKILLS FROM TEXT:", finalizedSkills);
     }
   }
 
-  // 3. Final Normalization (Handles strings, objects, and nested keys)
-  const finalizedSkills = rawSkills.map(s => {
+  // 3️⃣ Normalize (Handles strings, objects, and nested keys)
+  finalizedSkills = finalizedSkills.map(s => {
     if (typeof s === "string") {
       return { name: s.toLowerCase().trim(), level: 70 };
     }
-
     return {
-      // Safely check common keys returned by different AI parsers (name, skill, or value)
       name: (s.name || s.skill || s.value || "").toLowerCase().trim(),
       level: s.level || 70
     };
   }).filter(s => s.name !== "");
 
-  // ✅ SAFETY CHECK: Ensure we actually have data left after all attempts
+  // ❌ Still empty → Stop
   if (!finalizedSkills.length) {
-    console.log("❌ NO VALID SKILLS AFTER CLEANING AND RECOVERY:", resume.parsedData?.rawText ? "Raw text existed" : "Raw text empty");
-    throw new AppError('No valid skills could be extracted. Please ensure the resume contains technical keywords.', 400);
+    console.log("❌ NO SKILLS FOUND EVEN AFTER FALLBACK SCANS");
+    throw new AppError("No skills found in resume to generate recommendations.", 400);
   }
 
   console.log("✅ FINAL SKILLS PASSED TO MATCHER:", finalizedSkills);
   // ──────────────────────────────────────────────────────────────────────────────
 
-  // 4. Cache Check (unless refresh=true)
+  // 4. Cache Check (unless refresh=true is passed)
   const existing = await JobMatch.findOne({ resumeId }).sort({ createdAt: -1 });
   if (existing && !req.query.refresh) {
     return res.json({
@@ -141,7 +138,7 @@ const getStoredRecommendations = asyncHandler(async (req, res) => {
   });
 });
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
+// ─── Helper for consistent API responses ──────────────────────────────────────
 
 const formatJobMatchResponse = (jobMatch, resume) => ({
   matchId: jobMatch._id,
