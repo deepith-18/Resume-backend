@@ -1,88 +1,92 @@
-/**
- * Expanded Role Library covering Web, Mobile, Data, Cloud, Design, and Hardware
- */
-const ROLE_MAP = [
-  // --- WEB & FULL STACK ---
-  { title: "Frontend Developer", skills: ["react", "javascript", "html", "css", "tailwind", "typescript", "nextjs"] },
-  { title: "Backend Developer", skills: ["node", "express", "mongodb", "sql", "postgresql", "python", "rest api"] },
-  { title: "Full Stack Developer", skills: ["react", "node", "javascript", "mongodb", "sql", "express"] },
-  { title: "Software Engineer", skills: ["java", "python", "c++", "dsa", "problem solving", "git"] },
+// matcher.js
 
-  // --- DATA & AI ---
-  { title: "Data Scientist", skills: ["python", "pandas", "numpy", "statistics", "machine learning", "sql"] },
-  { title: "AI/ML Engineer", skills: ["python", "pytorch", "tensorflow", "deep learning", "nlp", "neural networks"] },
-  { title: "Data Analyst", skills: ["sql", "excel", "tableau", "powerbi", "data visualization", "python"] },
+const ROLE_MAP = [ /* KEEP YOUR SAME ROLE_MAP */ ];
 
-  // --- MOBILE & APPS ---
-  { title: "Mobile App Developer", skills: ["flutter", "dart", "react native", "firebase", "mobile design"] },
-  { title: "Android Developer", skills: ["kotlin", "java", "android sdk", "android studio", "firebase"] },
-  { title: "iOS Developer", skills: ["swift", "swiftui", "xcode", "objective-c", "core data"] },
+// ✅ SAFE NORMALIZATION
+const normalize = (str) => {
+  return str
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(".js", "")
+    .replace("c++", "cpp")
+    .replace("c#", "csharp");
+};
 
-  // --- CLOUD & SECURITY ---
-  { title: "DevOps Engineer", skills: ["aws", "docker", "kubernetes", "linux", "jenkins", "terraform", "cicd"] },
-  { title: "Cloud Architect", skills: ["aws", "azure", "gcp", "microservices", "serverless", "cloud computing"] },
-  { title: "Cybersecurity Analyst", skills: ["network security", "linux", "penetration testing", "cryptography", "ethical hacking"] },
+// ✅ SYNONYM HANDLING (CRUCIAL)
+const skillMap = {
+  js: "javascript",
+  node: "nodejs",
+  react: "reactjs",
+  mongo: "mongodb",
+  sql: "database",
+  mysql: "database",
+  postgresql: "database",
+};
 
-  // --- DESIGN & PRODUCT ---
-  { title: "UI/UX Designer", skills: ["figma", "adobe xd", "prototyping", "wireframing", "user research", "ui design"] },
-  { title: "Product Manager", skills: ["agile", "scrum", "jira", "product strategy", "market research", "leadership"] },
+const mapSkill = (skill) => {
+  const norm = normalize(skill);
+  return skillMap[norm] || norm;
+};
 
-  // --- HARDWARE & CORE ---
-  { title: "Embedded Systems Engineer", skills: ["c", "c++", "microcontrollers", "rtos", "embedded c", "arduino"] },
-  { title: "IoT Engineer", skills: ["arduino", "raspberry pi", "mqtt", "sensors", "python", "c++"] },
-  { title: "Aerospace Engineer", skills: ["matlab", "cad", "simulink", "thermodynamics", "aerodynamics"] }
-];
-
-/**
- * Normalizes strings by removing non-alphabetic characters.
- * Example: "Node.js" -> "nodejs", "React-Native" -> "reactnative"
- */
-const normalize = (str) => str.toLowerCase().replace(/[^a-z]/g, '');
-
-/**
- * Generates matches by comparing user skills against the expanded role map
- */
 const generateRoleMatches = (skills) => {
-  // Ensure we have an array and extract names
-  const skillNames = (skills || []).map(s => (s.name || "").toLowerCase().trim());
+  if (!skills || skills.length === 0) return [];
 
-  return ROLE_MAP.map(role => {
-    // ✅ ROBUST MATCH LOGIC
-    // Compares normalized versions of skills to handle dots, dashes, and spaces
-    const matched = role.skills.filter(reqSkill =>
-      skillNames.some(userSkill =>
-        normalize(userSkill).includes(normalize(reqSkill)) ||
-        normalize(reqSkill).includes(normalize(userSkill))
-      )
-    );
+  // ✅ HANDLE BOTH FORMATS
+  const skillNames = skills.map(s =>
+    typeof s === "string"
+      ? s.toLowerCase().trim()
+      : (s.name || "").toLowerCase().trim()
+  );
 
-    // ✅ REPLACEMENT SCORE LOGIC
-    // Linear scoring: 25 points per match to ensure visibility
-    const score = Math.min(matched.length * 25, 100);
+  const userSkills = skillNames.map(mapSkill);
+
+  const results = ROLE_MAP.map(role => {
+    const roleSkills = role.skills.map(mapSkill);
+
+    let matchCount = 0;
+
+    roleSkills.forEach(skill => {
+      if (userSkills.includes(skill)) {
+        matchCount++;
+      }
+    });
+
+    const score = Math.min((matchCount / roleSkills.length) * 100, 100);
 
     return {
       title: role.title,
-      matchScore: score, // Snake_case match for some components, camelCase for others
-      match_score: score, 
-      matched_skills: matched,
-      missing_skills: role.skills.filter(s => !matched.includes(s)),
-      reason: getReasonMessage(score)
+      matchScore: Math.round(score),
+      match_score: Math.round(score),
+      matched_skills: role.skills.filter(s =>
+        userSkills.includes(mapSkill(s))
+      ),
+      missing_skills: role.skills.filter(s =>
+        !userSkills.includes(mapSkill(s))
+      ),
+      reason: getReasonMessage(score),
+      _matchCount: matchCount // debug only
     };
-  })
-  // ✅ REMOVE STRICT FILTER (matchScore > 0)
-  .filter(r => r.matchScore > 0) 
-  .sort((a, b) => b.matchScore - a.matchScore)
-  // Limit to top 6 most relevant roles
-  .slice(0, 6);
+  });
+
+  // ✅ SORT FIRST
+  results.sort((a, b) => b.matchScore - a.matchScore);
+
+  // ✅ SOFT FILTER (NOT STRICT)
+  let filtered = results.filter(r => r._matchCount > 0);
+
+  // ✅ FALLBACK (CRITICAL)
+  if (filtered.length === 0) {
+    return results.slice(0, 6);
+  }
+
+  return filtered.slice(0, 6);
 };
 
-/**
- * Returns a human-readable label based on the calculated score.
- */
+// SAME FUNCTION (GOOD)
 function getReasonMessage(score) {
-  if (score >= 75) return "Top Career Match";
-  if (score >= 50) return "Strong Potential";
-  if (score >= 25) return "Good Alternative";
+  if (score >= 70) return "Top Career Match";
+  if (score >= 40) return "Strong Potential";
+  if (score >= 15) return "Good Alternative";
   return "Exploratory Match";
 }
 
