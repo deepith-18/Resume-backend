@@ -48,6 +48,9 @@ const performLocalAnalysis = (rawText, fileName = "") => {
 // ✅ UPLOAD: Handles file saving with forensic fallback for bad PDFs
 const uploadResume = async (req, res) => {
   try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ success: false, error: "User ID is required" });
+
     if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' });
 
     const file = req.file;
@@ -71,6 +74,7 @@ const uploadResume = async (req, res) => {
     const candidateName = rawText.length > 20 ? rawText.split("\n")[0].trim().substring(0, 50) : "Candidate";
 
     const resume = await Resume.create({
+      userId,
       fileName: file.originalname,
       filePath: file.path,
       fileSize: file.size,
@@ -157,7 +161,11 @@ const analyzeResumeById = async (req, res) => {
 // ✅ LIST: Dashboard view with dynamic score enrichment
 const listResumes = async (req, res) => {
   try {
-    const resumes = await Resume.find().sort({ createdAt: -1 });
+    const { userId } = req.query;
+
+    if (!userId) return res.json({ success: true, data: [] });
+
+    const resumes = await Resume.find({ userId }).sort({ createdAt: -1 });
 
     const enrichedResumes = resumes.map(resume => {
       const { overallScore } = performLocalAnalysis(resume.rawText, resume.fileName);
