@@ -6,7 +6,7 @@
 const asyncHandler = require('express-async-handler');
 const Resume = require('../models/Resume');
 const JobMatch = require('../models/Job');
-const { generateRoleMatches } = require('../services/matcher'); 
+const { generateRoleMatches } = require('../utils/matcher'); 
 const { AppError } = require('../utils/errorHandler');
 
 /**
