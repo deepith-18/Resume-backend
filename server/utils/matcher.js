@@ -1,4 +1,3 @@
-// ✅ Corrected for plain JavaScript (.js)
 const CANON = {
   "node": "nodejs",
   "nodejs": "nodejs",
@@ -34,9 +33,7 @@ const ROLE_MAP = [
   { title: "Mobile App Developer", skills: ["flutter", "dart", "reactnative", "firebase"] }
 ];
 
-/**
- * Safe normalization for the backend (JavaScript).
- */
+// ✅ Pure JS: No type annotations
 const normalize = (s) => {
   if (typeof s !== 'string' || !s) return "";
   
@@ -90,5 +87,4 @@ const generateRoleMatches = (skills = []) => {
     .slice(0, 6);
 };
 
-// Use module.exports for the backend (.js)
 module.exports = { generateRoleMatches, canonical };
