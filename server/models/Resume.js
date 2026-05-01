@@ -22,4 +22,4 @@ const resumeSchema = new mongoose.Schema({
   analysisStatus: String,
 }, { timestamps: true });
 
-module.exports = mongoose.model('Resume', resumeSchema);getResume()
+module.exports = mongoose.model('Resume', resumeSchema);
