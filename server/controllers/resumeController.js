@@ -57,7 +57,7 @@ const uploadResume = async (req, res) => {
     let rawText = "";
 
     try {
-      const dataBuffer = fs.readFileSync(file.path);
+      const dataBuffer = file.buffer;
       if (file.mimetype === "application/pdf") {
         const pdfData = await pdfParse(dataBuffer);
         rawText = pdfData.text?.trim() || "";

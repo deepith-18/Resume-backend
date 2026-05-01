@@ -9,7 +9,10 @@ const {
 } = require('../controllers/resumeController');
 
 const multer = require('multer');
-const upload = multer({ dest: 'uploads/' });
+
+// ✅ FIX: use memory storage (required for APK uploads)
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
 // ✅ LIST
 router.get('/', listResumes);
