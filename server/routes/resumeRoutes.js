@@ -11,16 +11,16 @@ const {
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
 
-// ✅ THIS IS CRITICAL ROUTE (YOU LOST THIS)
+// ✅ GET ALL RESUMES
 router.get('/', listResumes);
 
-// Upload
+// ✅ UPLOAD RESUME
 router.post('/upload', upload.single('resume'), uploadResume);
 
-// Analyze
+// ✅ ANALYZE RESUME
 router.post('/analyze/:resumeId', analyzeResumeById);
 
-// Get single (KEEP LAST)
+// ✅ GET SINGLE RESUME (KEEP LAST)
 router.get('/:resumeId', getResume);
 
 module.exports = router;

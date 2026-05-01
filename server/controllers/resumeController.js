@@ -143,7 +143,11 @@ const getResume = async (req, res) => {
 // LIST
 const listResumes = async (req, res) => {
   try {
-    const resumes = await Resume.find().sort({ createdAt: -1 });
+    console.log("🔥 /api/resume HIT");
+
+    const resumes = await Resume.find(); // remove sort temporarily
+
+    console.log("✅ Resumes:", resumes.length);
 
     res.json({
       success: true,
@@ -151,8 +155,12 @@ const listResumes = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Server error" });
+    console.error("❌ ERROR IN listResumes:", error);
+
+    res.status(500).json({
+      success: false,
+      error: error.message, // 👈 show real error
+    });
   }
 };
 
