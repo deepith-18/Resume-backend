@@ -4,7 +4,7 @@ const router = express.Router();
 const Resume = require('../models/Resume');
 const { generateRoleMatches } = require('../services/matcher');
 
-router.get("/resume/:id", async (req, res) => {
+router.get("/:id", async (req, res) => {
   try {
     const resume = await Resume.findById(req.params.id);
 
