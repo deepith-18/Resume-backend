@@ -5,57 +5,51 @@ const Resume = require('../models/Resume');
 const { generateRoleMatches } = require('../services/matcher');
 
 /**
- * GET /resume/:id
- * Fetch resume + generate role matches
+ * ✅ GET ALL RESUMES (THIS WAS MISSING)
  */
-router.get("/resume/:id", async (req, res) => {
+router.get("/", async (req, res) => {
   try {
-    const { id } = req.params;
+    const resumes = await Resume.find().sort({ createdAt: -1 });
 
-    // 🔍 Validate ID format (prevents crash)
-    if (!id) {
-      return res.status(400).json({ error: "Resume ID is required" });
-    }
+    res.json({
+      success: true,
+      data: resumes
+    });
 
-    const resume = await Resume.findById(id);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+/**
+ * ✅ GET ONE RESUME + MATCHES
+ */
+router.get("/:id", async (req, res) => {
+  try {
+    const resume = await Resume.findById(req.params.id);
 
     if (!resume) {
       return res.status(404).json({ error: "Resume not found" });
     }
 
-    // ✅ Extract skills safely from parsedData
     const rawSkills = resume.parsedData?.skills || [];
 
-    // ✅ Convert objects → strings
     const skillsForMatcher = rawSkills
       .map(skill => skill?.name)
-      .filter(Boolean); // remove undefined/null
+      .filter(Boolean);
 
-    console.log("✅ SKILLS EXTRACTED:", skillsForMatcher);
+    const matches = generateRoleMatches(skillsForMatcher);
 
-    // ⚠️ Safety: handle empty skills
-    let matches = [];
-    if (skillsForMatcher.length > 0) {
-      matches = generateRoleMatches(skillsForMatcher);
-    } else {
-      console.log("⚠️ No skills found in resume");
-    }
-
-    console.log("✅ MATCH RESULTS:", matches);
-
-    return res.status(200).json({
+    res.json({
       success: true,
       resume,
       matches
     });
 
   } catch (err) {
-    console.error("❌ Route Error:", err);
-
-    return res.status(500).json({
-      success: false,
-      error: "Internal Server Error"
-    });
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 

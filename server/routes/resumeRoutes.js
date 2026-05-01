@@ -1,35 +1,26 @@
 const express = require('express');
 const router = express.Router();
 
-const Resume = require('../models/Resume');
-const { generateRoleMatches } = require('../services/matcher');
+const {
+  uploadResume,
+  analyzeResumeById,
+  getResume,
+  listResumes,
+} = require('../controllers/resumeController');
 
-router.get("/:id", async (req, res) => {
-  try {
-    const resume = await Resume.findById(req.params.id);
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' });
 
-    if (!resume) {
-      return res.status(404).json({ error: "Resume not found" });
-    }
+// ✅ THIS IS CRITICAL ROUTE (YOU LOST THIS)
+router.get('/', listResumes);
 
-    const rawSkills = resume.parsedData?.skills || [];
+// Upload
+router.post('/upload', upload.single('resume'), uploadResume);
 
-    const skillsForMatcher = rawSkills
-      .map(skill => skill?.name)
-      .filter(Boolean);
+// Analyze
+router.post('/analyze/:resumeId', analyzeResumeById);
 
-    const matches = generateRoleMatches(skillsForMatcher);
-
-    res.json({
-      success: true,
-      resume,
-      matches
-    });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
+// Get single (KEEP LAST)
+router.get('/:resumeId', getResume);
 
 module.exports = router;
