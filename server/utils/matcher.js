@@ -1,7 +1,7 @@
 const CANON = {
   "node": "nodejs",
   "nodejs": "nodejs",
-  "node.js": "nodejs",
+  "nodejs": "nodejs",
   "js": "javascript",
   "javascript": "javascript",
   "reactjs": "react",
@@ -33,21 +33,33 @@ const ROLE_MAP = [
   { title: "Mobile App Developer", skills: ["flutter", "dart", "reactnative", "firebase"] }
 ];
 
-const normalize = (s = "") =>
-  s.toLowerCase()
+const normalize = (s = "") => {
+  if (typeof s !== 'string') return "";
+  return s.toLowerCase()
     .replace(/\(.*?\)/g, "")
     .replace(/\.js/g, "js")
     .replace(/[^a-z0-9+#]/g, "");
+};
 
 const canonical = (s) => {
   const n = normalize(s);
   return CANON[n] || n;
 };
 
+/**
+ * FIXED: Handles both string arrays and object arrays [{name: 'Skill'}]
+ */
 const generateRoleMatches = (skills = []) => {
   if (!Array.isArray(skills) || skills.length === 0) return [];
 
-  const userSkills = [...new Set(skills.map(s => canonical(s)))];
+  // ✅ FIX: Ensure we extract the 'name' property if skills are objects
+  const rawSkillNames = skills.map(s => {
+    if (typeof s === 'string') return s;
+    if (s && typeof s === 'object' && s.name) return s.name;
+    return "";
+  });
+
+  const userSkills = [...new Set(rawSkillNames.map(s => canonical(s)))].filter(Boolean);
 
   const results = ROLE_MAP.map(role => {
     const matched = [];
