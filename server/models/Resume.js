@@ -1,128 +1,40 @@
-/**
- * models/Resume.js — Mongoose schema for uploaded and analyzed resumes
- */
+const express = require('express');
+const router = express.Router();
+const Resume = require('../models/Resume');
+const { generateRoleMatches } = require('../utils/matcher');
 
-const mongoose = require('mongoose');
+router.get("/resume/:id", async (req, res) => {
+  try {
+    const resume = await Resume.findById(req.params.id);
 
-const skillSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  category: {
-    type: String,
-    enum: ['technical', 'soft', 'language', 'tool', 'framework', 'other'],
-    default: 'other',
-  },
-  proficiency: {
-    type: String,
-    enum: ['beginner', 'intermediate', 'advanced', 'expert'],
-    default: 'intermediate',
-  },
-}, { _id: false });
+    if (!resume) {
+      return res.status(404).json({ message: "Resume not found" });
+    }
 
-const experienceSchema = new mongoose.Schema({
-  company: String,
-  role: String,
-  duration: String,          // e.g. "2 years"
-  startDate: String,
-  endDate: String,
-  description: String,
-  technologies: [String],
-}, { _id: false });
+    // ✅ FIXED PATH: Get the objects from parsedData
+    const rawSkills = resume.parsedData?.skills || [];
 
-const educationSchema = new mongoose.Schema({
-  institution: String,
-  degree: String,
-  field: String,
-  graduationYear: String,
-  gpa: String,
-}, { _id: false });
+    // ✅ EXTRACTION: The matcher needs strings, not objects.
+    // This maps [{name: 'Java', ...}, {name: 'Python', ...}] -> ['Java', 'Python']
+    const skillsForMatcher = rawSkills.map(skill => skill.name);
 
-const resumeSchema = new mongoose.Schema(
-  {
-    // File metadata
-    fileName: {
-      type: String,
-      required: [true, 'File name is required'],
-      trim: true,
-    },
-  fileType: {
-  type: String,
-  enum: ['pdf', 'docx', 'doc'],
-  required: true,
-},
-    filePath: {
-      type: String,
-      required: true,
-    },
-    fileSize: {
-      type: Number, // bytes
-      required: true,
-    },
+    console.log("✅ SKILLS EXTRACTED FOR MATCHER:", skillsForMatcher);
 
-    // Extracted raw text
-   rawText: {
-  type: String,
-  default: "No text extracted",
-},
+    // Call the matching logic
+    const matches = generateRoleMatches(skillsForMatcher);
 
-    // AI-parsed structured data
-    parsedData: {
-      name: String,
-      email: String,
-      phone: String,
-      location: String,
-      linkedIn: String,
-      summary: String,
-      totalExperienceYears: Number,
-      experienceLevel: {
-        type: String,
-        enum: ['entry', 'junior', 'mid', 'senior', 'lead', 'executive'],
-      },
-      skills: [skillSchema],
-      experience: [experienceSchema],
-      education: [educationSchema],
-      certifications: [String],
-      languages: [String],
-    },
+    console.log("✅ MATCH RESULTS:", matches);
 
-    // Analysis metadata
-    analysisStatus: {
-      type: String,
-      enum: ['pending', 'processing', 'completed', 'failed'],
-      default: 'pending',
-    },
-    analysisError: String,
-    overallScore: {
-      type: Number,
-      min: 0,
-      max: 100,
-    },
-    strengths: [String],
-    improvements: [String],
-    aiSummary: String,
+    res.json({
+      success: true,
+      resume,
+      matches
+    });
 
-    // Processing timestamps
-    uploadedAt: {
-      type: Date,
-      default: Date.now,
-    },
-    analyzedAt: Date,
-  },
-  {
-    timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
+  } catch (err) {
+    console.error("Route Error:", err);
+    res.status(500).json({ error: "Server error" });
   }
-);
-
-// Virtual: formatted file size
-resumeSchema.virtual('fileSizeFormatted').get(function () {
-  const kb = this.fileSize / 1024;
-  if (kb < 1024) return `${kb.toFixed(1)} KB`;
-  return `${(kb / 1024).toFixed(1)} MB`;
 });
 
-// Index for faster queries
-resumeSchema.index({ analysisStatus: 1, createdAt: -1 });
-resumeSchema.index({ 'parsedData.skills.name': 1 });
-
-module.exports = mongoose.model('Resume', resumeSchema);
+module.exports = router;
