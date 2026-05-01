@@ -59,11 +59,6 @@ const uploadResume = async (req, res) => {
       fileSize: file.size,
       fileType: file.originalname.split('.').pop().toLowerCase(),
       rawText,
-      parsedData: {
-        name: candidateName,
-        skills: [], // Filled dynamically in getResume
-        experienceLevel: "junior",
-      },
       analysisStatus: "completed", // Set to completed as we use local parsing
       overallScore: 75,
       aiSummary: "Processed successfully using local keyword analysis.",
@@ -91,29 +86,54 @@ const getResume = async (req, res) => {
     const text = (resume.rawText || "");
     const lowerText = text.toLowerCase();
 
-    // ... (Keep your existing Skill Extraction logic here) ...
+    // 1. 🔥 REGEX SKILL EXTRACTION
+    const extracted = [];
+    
+    KNOWN_TECH.forEach(skill => {
+      // Escape special characters in skill name for regex (like c++)
+      const escapedSkill = skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`\\b${escapedSkill}\\b`, "i");
+      
+      if (regex.test(lowerText)) {
+        extracted.push(skill);
+      } else if (skill === "node" && (lowerText.includes("node.js") || lowerText.includes("nodejs"))) {
+        extracted.push(skill);
+      } else if (skill === "javascript" && lowerText.includes(" js ")) {
+        extracted.push(skill);
+      }
+    });
+
+    PHRASES.forEach(p => {
+      if (lowerText.includes(p.toLowerCase())) {
+        extracted.push(p);
+      }
+    });
+
     const cleaned = [...new Set(extracted.map(s => canonical(s)))].filter(s => !STOP_WORDS.has(s));
 
-    // ✅ NEW: SMART SUMMARY EXTRACTION
+    // 2. ✅ SMART SUMMARY EXTRACTION
     let summary = "";
-    // Regex looks for "Summary" or "Objective" followed by 50-300 characters of text
     const summaryMatch = text.match(/(summary|objective)[\s:]*([\s\S]{50,300})/i);
 
     if (summaryMatch) {
-      summary = summaryMatch[2].split("\n\n")[0].trim(); // Get the first paragraph
+      summary = summaryMatch[2].split("\n\n")[0].trim(); 
     } else {
-      // Fallback: Get the first two long lines that look like a bio
       const lines = text.split("\n").filter(l => l.trim().length > 30);
       summary = lines.slice(0, 2).join(" ");
     }
 
+    // 3. ✅ DYNAMIC UI CALCULATIONS
     const name = text.split("\n")[0]?.trim() || "Candidate";
     const overallScore = Math.min(cleaned.length * 8 + 40, 95);
     const experienceLevel = cleaned.length >= 10 ? "senior" : cleaned.length >= 6 ? "intermediate" : "junior";
     
     const matches = generateRoleMatches(cleaned);
     const formattedSkills = cleaned.slice(0, 15).map(s => ({
-      name: s === "nodejs" ? "Node.js" : s === "machinelearning" ? "Machine Learning" : s === "cpp" ? "C++" : s === "csharp" ? "C#" : s.charAt(0).toUpperCase() + s.slice(1),
+      name: s === "nodejs" ? "Node.js" : 
+            s === "machinelearning" ? "Machine Learning" : 
+            s === "cpp" ? "C++" : 
+            s === "csharp" ? "C#" : 
+            s.charAt(0).toUpperCase() + s.slice(1),
       category: "technical",
       proficiency: "intermediate"
     }));
@@ -124,18 +144,19 @@ const getResume = async (req, res) => {
         ...resume._doc,
         parsedData: { name, skills: formattedSkills, experienceLevel },
         overallScore,
-        aiSummary: summary, // ✅ Now shows real resume text
+        aiSummary: summary, 
         strengths: ["Technical Proficiency", "Clear Structure"],
         improvements: ["Add more project links", "Highlight achievements"]
       },
       matches
     });
   } catch (error) {
+    console.error("❌ getResume Error:", error);
     res.status(500).json({ success: false, error: "Internal Server Error" });
   }
 };
 
-// ✅ ANALYZE: Stable fallback (No-op as upload handles parsing)
+// ✅ ANALYZE: Stable fallback
 const analyzeResumeById = async (req, res) => {
   try {
     const { resumeId } = req.params;
