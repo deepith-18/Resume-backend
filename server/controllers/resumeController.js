@@ -83,7 +83,6 @@ const uploadResume = async (req, res) => {
 };
 
 // ✅ GET ONE: Extracts skills on the fly and generates job matches
-// ✅ GET ONE: Extracts skills, name, score, and summary on the fly
 const getResume = async (req, res) => {
   try {
     const resume = await Resume.findById(req.params.resumeId);
@@ -92,70 +91,46 @@ const getResume = async (req, res) => {
     const text = (resume.rawText || "");
     const lowerText = text.toLowerCase();
 
-    // 1. REGEX EXTRACTION
-    const extracted = [];
-    KNOWN_TECH.forEach(skill => {
-      const escapedSkill = skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const regex = new RegExp(`\\b${escapedSkill}\\b`, "i");
-      if (regex.test(lowerText)) {
-        extracted.push(skill);
-      } else if (skill === "node" && (lowerText.includes("node.js") || lowerText.includes("nodejs"))) {
-        extracted.push(skill);
-      } else if (skill === "javascript" && lowerText.includes(" js ")) {
-        extracted.push(skill);
-      }
-    });
+    // ... (Keep your existing Skill Extraction logic here) ...
+    const cleaned = [...new Set(extracted.map(s => canonical(s)))].filter(s => !STOP_WORDS.has(s));
 
-    PHRASES.forEach(p => {
-      if (lowerText.includes(p.toLowerCase())) extracted.push(p);
-    });
+    // ✅ NEW: SMART SUMMARY EXTRACTION
+    let summary = "";
+    // Regex looks for "Summary" or "Objective" followed by 50-300 characters of text
+    const summaryMatch = text.match(/(summary|objective)[\s:]*([\s\S]{50,300})/i);
 
-    const cleaned = [...new Set(extracted.map(s => canonical(s)))]
-      .filter(s => !STOP_WORDS.has(s));
+    if (summaryMatch) {
+      summary = summaryMatch[2].split("\n\n")[0].trim(); // Get the first paragraph
+    } else {
+      // Fallback: Get the first two long lines that look like a bio
+      const lines = text.split("\n").filter(l => l.trim().length > 30);
+      summary = lines.slice(0, 2).join(" ");
+    }
 
-    // 2. ✅ FIX: DYNAMIC FIELDS FOR UI (Solves 0% Score & Demo User)
     const name = text.split("\n")[0]?.trim() || "Candidate";
+    const overallScore = Math.min(cleaned.length * 8 + 40, 95);
+    const experienceLevel = cleaned.length >= 10 ? "senior" : cleaned.length >= 6 ? "intermediate" : "junior";
     
-    const experienceLevel = 
-      cleaned.length >= 10 ? "senior" :
-      cleaned.length >= 6 ? "intermediate" : 
-      cleaned.length >= 3 ? "junior" : "fresher";
-
-    const overallScore = Math.min(cleaned.length * 8 + 40, 95); 
-    const summary = `Profile successfully analyzed. Detected ${cleaned.length} core technical competencies including ${cleaned.slice(0, 3).join(', ')}.`;
-
     const matches = generateRoleMatches(cleaned);
-
     const formattedSkills = cleaned.slice(0, 15).map(s => ({
-      name: s === "nodejs" ? "Node.js" :
-            s === "machinelearning" ? "Machine Learning" :
-            s === "cpp" ? "C++" :
-            s === "csharp" ? "C#" :
-            s.charAt(0).toUpperCase() + s.slice(1),
+      name: s === "nodejs" ? "Node.js" : s === "machinelearning" ? "Machine Learning" : s === "cpp" ? "C++" : s === "csharp" ? "C#" : s.charAt(0).toUpperCase() + s.slice(1),
       category: "technical",
       proficiency: "intermediate"
     }));
 
-    // 3. ✅ FINAL SYNCED RESPONSE
     res.json({
       success: true,
       data: {
         ...resume._doc,
-        parsedData: { 
-          name, 
-          skills: formattedSkills, 
-          experienceLevel 
-        },
+        parsedData: { name, skills: formattedSkills, experienceLevel },
         overallScore,
-        aiSummary: summary,
-        strengths: ["Technical Skills", "Document Structure"],
-        improvements: ["Project Details", "Certifications"]
+        aiSummary: summary, // ✅ Now shows real resume text
+        strengths: ["Technical Proficiency", "Clear Structure"],
+        improvements: ["Add more project links", "Highlight achievements"]
       },
       matches
     });
-
   } catch (error) {
-    console.error("❌ getResume Error:", error);
     res.status(500).json({ success: false, error: "Internal Server Error" });
   }
 };
