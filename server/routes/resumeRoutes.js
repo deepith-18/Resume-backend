@@ -1,26 +1,52 @@
 const express = require('express');
 const router = express.Router();
 
-const {
-  uploadResume,
-  analyzeResumeById,
-  getResume,
-  listResumes,
-} = require('../controllers/resumeController');
-
-const multer = require('multer');
-const upload = multer({ dest: 'uploads/' });
+const Resume = require('../models/Resume');
+const { generateRoleMatches } = require('../services/matcher');
 
 // ✅ GET ALL RESUMES
-router.get('/', listResumes);
+router.get("/", async (req, res) => {
+  try {
+    const resumes = await Resume.find().sort({ createdAt: -1 });
 
-// ✅ UPLOAD RESUME
-router.post('/upload', upload.single('resume'), uploadResume);
+    res.json({
+      success: true,
+      data: resumes
+    });
 
-// ✅ ANALYZE RESUME
-router.post('/analyze/:resumeId', analyzeResumeById);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
-// ✅ GET SINGLE RESUME (KEEP LAST)
-router.get('/:resumeId', getResume);
+// ✅ GET ONE + MATCHES
+router.get("/:id", async (req, res) => {
+  try {
+    const resume = await Resume.findById(req.params.id);
 
-module.exports = router;
+    if (!resume) {
+      return res.status(404).json({ error: "Resume not found" });
+    }
+
+    const rawSkills = resume.parsedData?.skills || [];
+
+    const skillsForMatcher = rawSkills
+      .map(skill => skill?.name)
+      .filter(Boolean);
+
+    const matches = generateRoleMatches(skillsForMatcher);
+
+    res.json({
+      success: true,
+      resume,
+      matches
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+module.exports = router; // ✅ THIS IS CORRECT
