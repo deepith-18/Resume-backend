@@ -34,15 +34,15 @@ const ROLE_MAP = [
 ];
 
 /**
- * Normalizes strings safely. 
- * Includes a strict type check to prevent 'toLowerCase of undefined' errors.
+ * Normalizes strings with a strict safety check to prevent TypeErrors.
  */
 const normalize = (s) => {
+  // ✅ THE CRITICAL FIX: If s is undefined, null, or not a string, return ""
   if (typeof s !== 'string' || !s) return "";
   
   return s.toLowerCase()
-    .replace(/\.js/g, "js") // handles node.js -> nodejs
-    .replace(/[^a-z0-9+#]/g, ""); // strips spaces and special characters
+    .replace(/\.js/g, "js") 
+    .replace(/[^a-z0-9+#]/g, ""); 
 };
 
 const canonical = (s) => {
@@ -51,14 +51,11 @@ const canonical = (s) => {
 };
 
 const generateRoleMatches = (skills = []) => {
-  // 1. Safety check for input
-  if (!Array.isArray(skills) || skills.length === 0) {
-    console.log("⚠️ No skills array provided to matcher.");
-    return [];
-  }
+  // 1. Array check
+  if (!Array.isArray(skills) || skills.length === 0) return [];
 
   // 2. Extract and Normalize user skills
-  // Handles both string arrays and object arrays [{name: 'Java'}]
+  // Defensive extraction for string arrays or object arrays [{name: 'Java'}]
   const userSkills = [...new Set(skills.map(s => {
     let nameToProcess = "";
     if (typeof s === 'string') {
@@ -67,7 +64,7 @@ const generateRoleMatches = (skills = []) => {
       nameToProcess = s.name || s.title || "";
     }
     return canonical(nameToProcess);
-  }))].filter(Boolean); // Removes any resulting empty strings
+  }))].filter(Boolean); // Only keep valid strings
 
   console.log("🎯 USER SKILLS (CANONICAL):", userSkills);
 
@@ -75,16 +72,13 @@ const generateRoleMatches = (skills = []) => {
   const results = ROLE_MAP.map(role => {
     const matched = [];
     
-    // Normalize role requirements to match canonical user skills
     role.skills.forEach(roleSkill => {
       const canonReq = canonical(roleSkill);
-      // Ensure the requirement is valid and present in user's skills
       if (canonReq && userSkills.includes(canonReq)) {
         matched.push(roleSkill);
       }
     });
 
-    // Score calculation (weighted against a minimum of 4 skills for realistic scoring)
     const score = Math.round((matched.length / Math.max(role.skills.length, 4)) * 100);
 
     return {
@@ -96,7 +90,7 @@ const generateRoleMatches = (skills = []) => {
     };
   });
 
-  // 4. Return anything with at least ONE match
+  // 4. Return results with at least one match
   const filtered = results
     .filter(r => r.matched_skills.length > 0)
     .sort((a, b) => b.matchScore - a.matchScore)
