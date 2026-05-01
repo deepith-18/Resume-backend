@@ -103,6 +103,7 @@ const analyzeResumeById = async (req, res) => {
     }
 
     const aiResult = await analyzeResume(resume.rawText);
+    console.log("🔥 AI RESULT:", aiResult);
 
     const parsedData = {
       name: aiResult.name || "Candidate",
