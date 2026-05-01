@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const Resume = require('../models/Resume');
-const { generateRoleMatches } = require('../utils/matcher');
+const { generateRoleMatches } = require('../services/matcher');
 
 /**
  * GET /resume/:id
