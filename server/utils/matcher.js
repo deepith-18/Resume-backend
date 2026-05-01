@@ -1,3 +1,4 @@
+// ✅ Corrected for plain JavaScript (.js)
 const CANON = {
   "node": "nodejs",
   "nodejs": "nodejs",
@@ -34,10 +35,9 @@ const ROLE_MAP = [
 ];
 
 /**
- * Normalizes strings with a strict safety check to prevent TypeErrors.
+ * Safe normalization for the backend (JavaScript).
  */
 const normalize = (s) => {
-  // ✅ THE CRITICAL FIX: If s is undefined, null, or not a string, return ""
   if (typeof s !== 'string' || !s) return "";
   
   return s.toLowerCase()
@@ -51,11 +51,8 @@ const canonical = (s) => {
 };
 
 const generateRoleMatches = (skills = []) => {
-  // 1. Array check
   if (!Array.isArray(skills) || skills.length === 0) return [];
 
-  // 2. Extract and Normalize user skills
-  // Defensive extraction for string arrays or object arrays [{name: 'Java'}]
   const userSkills = [...new Set(skills.map(s => {
     let nameToProcess = "";
     if (typeof s === 'string') {
@@ -64,11 +61,8 @@ const generateRoleMatches = (skills = []) => {
       nameToProcess = s.name || s.title || "";
     }
     return canonical(nameToProcess);
-  }))].filter(Boolean); // Only keep valid strings
+  }))].filter(Boolean);
 
-  console.log("🎯 USER SKILLS (CANONICAL):", userSkills);
-
-  // 3. Match against roles
   const results = ROLE_MAP.map(role => {
     const matched = [];
     
@@ -90,14 +84,11 @@ const generateRoleMatches = (skills = []) => {
     };
   });
 
-  // 4. Return results with at least one match
-  const filtered = results
+  return results
     .filter(r => r.matched_skills.length > 0)
     .sort((a, b) => b.matchScore - a.matchScore)
     .slice(0, 6);
-
-  console.log("✅ MATCH RESULTS GENERATED:", filtered.length);
-  return filtered;
 };
 
+// Use module.exports for the backend (.js)
 module.exports = { generateRoleMatches, canonical };
