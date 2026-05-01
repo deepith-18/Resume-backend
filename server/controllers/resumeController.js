@@ -181,12 +181,59 @@ const analyzeResumeById = async (req, res) => {
 };
 
 // ✅ LIST: Fetches all resumes
+// ✅ LIST: Fetches all resumes and dynamically calculates scores for the Dashboard
 const listResumes = async (req, res) => {
   try {
+    // 1. Fetch resumes sorted by newest first
     const resumes = await Resume.find().sort({ createdAt: -1 });
+
+    // 2. Enrich each resume in the list with its calculated score
+    const enrichedResumes = resumes.map(resume => {
+      const text = (resume.rawText || "").toLowerCase();
+      const extracted = [];
+
+      // Re-run the extraction logic used in getResume for consistency
+      KNOWN_TECH.forEach(skill => {
+        const escapedSkill = skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`\\b${escapedSkill}\\b`, "i");
+        
+        if (regex.test(text)) {
+          extracted.push(skill);
+        } else if (skill === "node" && (text.includes("node.js") || text.includes("nodejs"))) {
+          extracted.push(skill);
+        } else if (skill === "javascript" && text.includes(" js ")) {
+          extracted.push(skill);
+        }
+      });
+
+      PHRASES.forEach(p => {
+        if (text.includes(p.toLowerCase())) {
+          extracted.push(p);
+        }
+      });
+
+      const cleaned = [...new Set(extracted.map(s => canonical(s)))]
+        .filter(s => !STOP_WORDS.has(s));
+
+      // Calculate the score using the same formula as the detail screen
+      const calculatedScore = cleaned.length > 0 
+        ? Math.min(cleaned.length * 8 + 40, 95) 
+        : 0;
+
+      return {
+        ...resume._doc,
+        overallScore: calculatedScore,
+        // Also update the name dynamically for the home screen if needed
+        parsedData: {
+          ...resume.parsedData,
+          name: resume.rawText?.split("\n")[0]?.trim()?.substring(0, 50) || "Candidate"
+        }
+      };
+    });
+
     res.json({
       success: true,
-      data: resumes,
+      data: enrichedResumes,
     });
   } catch (error) {
     console.error("❌ ERROR IN listResumes:", error);
