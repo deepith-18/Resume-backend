@@ -37,11 +37,13 @@ router.get("/:id", async (req, res) => {
 
     const matches = generateRoleMatches(skillsForMatcher);
 
-    res.json({
-      success: true,
-      resume,
-      matches
-    });
+  res.json({
+  success: true,
+  data: {
+    resume,
+    matches
+  }
+});
 
   } catch (err) {
     console.error(err);
