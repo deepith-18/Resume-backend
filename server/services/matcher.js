@@ -1,6 +1,5 @@
-/**
- * Role Library with target skills
- */
+// services/matcher.js
+
 const ROLE_MAP = [
   { title: "Frontend Developer", skills: ["react", "javascript", "html", "css", "tailwind", "typescript", "nextjs"] },
   { title: "Backend Developer", skills: ["node", "express", "mongodb", "sql", "postgresql", "python", "rest api"] },
@@ -20,20 +19,16 @@ const synonymMap = {
   mysql: "sql",
   ai: "machinelearning",
   ml: "machinelearning",
+  artificialintelligence: "machinelearning",
   dsa: "datastructuresalgorithms",
   nodejs: "node",
-  expressjs: "express",
-artificialintelligence: "machinelearning"
+  expressjs: "express"
 };
 
-/**
- * Normalizes input: Removes brackets, dots, and special chars.
- * Preserves 'cpp' and 'csharp' naming.
- */
 const normalize = (str) => {
   if (!str) return "";
   return str.toLowerCase()
-    .replace(/\(.*?\)/g, "")     // Remove (ml), (ai)
+    .replace(/\(.*?\)/g, "")
     .replace(/\.js/g, "js")
     .replace(/\+/g, "p")
     .replace(/#/g, "sharp")
@@ -49,28 +44,25 @@ const getBaseSkill = (s) => {
 const generateRoleMatches = (skills) => {
   if (!skills || !Array.isArray(skills) || skills.length === 0) return [];
 
-  // Convert input array to standardized base strings
-  const userSkills = skills.map(s => getBaseSkill(s)).filter(s => s.length > 0);
+  const userSkills = skills.map(getBaseSkill).filter(Boolean);
 
   const results = ROLE_MAP.map(role => {
     const matched_skills = [];
-    
+
     role.skills.forEach(roleSkill => {
       const baseRoleSkill = getBaseSkill(roleSkill);
-      
-      // ✅ SAFE MATCH: Avoids false positives for short words (like sql vs nosql)
-      const isMatch = userSkills.some(uSkill => {
-        return (
-          uSkill === baseRoleSkill ||
-          (uSkill.length > 4 && uSkill.includes(baseRoleSkill)) ||
-          (baseRoleSkill.length > 4 && baseRoleSkill.includes(uSkill))
-        );
-      });
 
-      if (isMatch) matched_skills.push(roleSkill);
+      const isMatch = userSkills.some(uSkill =>
+        uSkill === baseRoleSkill ||
+        (uSkill.length > 4 && uSkill.includes(baseRoleSkill)) ||
+        (baseRoleSkill.length > 4 && baseRoleSkill.includes(uSkill))
+      );
+
+      if (isMatch && !matched_skills.includes(roleSkill)) {
+        matched_skills.push(roleSkill);
+      }
     });
 
-    // ✅ STABILIZED SCORE
     const score = Math.round(
       (matched_skills.length / Math.max(role.skills.length, 5)) * 100
     );
@@ -80,16 +72,17 @@ const generateRoleMatches = (skills) => {
       matchScore: Math.min(score, 100),
       matched_skills,
       missing_skills: role.skills.filter(s => !matched_skills.includes(s)),
-      reason: score >= 70 ? "Top Career Match" : score >= 40 ? "Strong Potential" : "Exploratory Match"
+      reason:
+        score >= 70 ? "Top Career Match" :
+        score >= 40 ? "Strong Potential" :
+        "Exploratory Match"
     };
   });
 
-  // Sort and Return top 6
   results.sort((a, b) => b.matchScore - a.matchScore);
-  
-  // Guaranteed output: If no matches, return first 6 roles as exploratory
-  const finalResults = results.filter(r => r.matchScore > 0);
-  return finalResults.length > 0 ? finalResults.slice(0, 6) : results.slice(0, 6);
+
+  const filtered = results.filter(r => r.matchScore > 0);
+  return filtered.length > 0 ? filtered.slice(0, 6) : results.slice(0, 6);
 };
 
 module.exports = { generateRoleMatches };
