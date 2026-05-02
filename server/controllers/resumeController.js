@@ -13,10 +13,20 @@ const STOP_WORDS = new Set([
 const KNOWN_TECH = [
   "java", "python", "javascript", "react", "node", "mongodb", "sql",
   "html", "css", "git", "docker", "kubernetes", "redis", "typescript",
-  "flutter", "dart", "firebase", "express", "cpp", "csharp"
+  "flutter", "dart", "firebase", "express", "cpp", "csharp",
+  // ✅ NEW: Electrical & Electronics
+  "matlab", "simulink", "arduino", "raspberry pi", "plc", "vlsi", "verilog", "pcb", "labview",
+  // ✅ NEW: Aerospace & Mechanical
+  "ansys", "autocad", "solidworks", "catia", "propulsion", "aerodynamics", "thermodynamics", "cad",
+  // ✅ NEW: Civil & General Engineering
+  "revit", "staad pro", "surveying", "project management", "six sigma", "lean"
 ];
 
-const PHRASES = ["machine learning", "data science", "rest api", "deep learning", "computer vision"];
+const PHRASES = [
+  "machine learning", "data science", "rest api", "deep learning", "computer vision",
+  // ✅ NEW: Core Engineering Phrases
+  "circuit design", "embedded systems", "structural analysis", "fluid dynamics", "power systems"
+];
 
 /**
  * Consistently extracts skills and calculates a realistic score.
@@ -39,8 +49,14 @@ const performLocalAnalysis = (rawText, fileName = "") => {
 
   const cleaned = [...new Set(extracted.map(s => canonical(s)))].filter(s => !STOP_WORDS.has(s));
   
-  // Base 40 ensures variety on the dashboard even for thin resumes
-  let score = cleaned.length > 0 ? Math.min(cleaned.length * 7 + 40, 95) : 40;
+  // ✅ ENHANCED SCORING:
+  // If no technical keywords are found, we check for common engineering indicators 
+  // to avoid a 0 score for high-quality non-CS resumes.
+  const hasEngineeringTerms = /engineer|analysis|design|project|systems|technical/i.test(text);
+  
+  let score = cleaned.length > 0 
+    ? Math.min(cleaned.length * 8 + 45, 95) 
+    : (hasEngineeringTerms ? 50 : 40); // Higher floor for engineering profiles
   
   return { cleaned, overallScore: score };
 };
@@ -115,15 +131,25 @@ const getResume = async (req, res) => {
     const experienceLevel = cleaned.length >= 10 ? "senior" : cleaned.length >= 6 ? "intermediate" : "junior";
     
     const matches = generateRoleMatches(cleaned);
-    const formattedSkills = cleaned.slice(0, 15).map(s => ({
-      name: s === "nodejs" ? "Node.js" : 
-            s === "machinelearning" ? "Machine Learning" : 
-            s === "cpp" ? "C++" : 
-            s === "csharp" ? "C#" : 
-            s.charAt(0).toUpperCase() + s.slice(1),
-      category: "technical",
-      proficiency: "intermediate"
-    }));
+    const formattedSkills = cleaned.slice(0, 15).map(s => {
+      const specialCases = {
+        "nodejs": "Node.js",
+        "machinelearning": "Machine Learning",
+        "cpp": "C++",
+        "csharp": "C#",
+        "matlab": "MATLAB",
+        "autocad": "AutoCAD",
+        "vlsi": "VLSI",
+        "pcb": "PCB",
+        "ansys": "ANSYS"
+      };
+
+      return {
+        name: specialCases[s] || s.charAt(0).toUpperCase() + s.slice(1),
+        category: "technical",
+        proficiency: "intermediate"
+      };
+    });
 
     res.json({
       success: true,
