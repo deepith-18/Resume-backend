@@ -110,6 +110,32 @@ const uploadResume = async (req, res) => {
   }
 };
 
+// ✅ DELETE: Remove an uploaded resume and its stored file
+const deleteResumeById = async (req, res) => {
+  try {
+    const { resumeId } = req.params;
+    const { userId } = req.query;
+
+    const resume = await Resume.findById(resumeId);
+    if (!resume) return res.status(404).json({ success: false, error: 'Resume not found' });
+
+    if (userId && resume.userId && resume.userId.toString() !== userId) {
+      return res.status(403).json({ success: false, error: 'Not authorized to delete this resume' });
+    }
+
+    if (resume.filePath && fs.existsSync(resume.filePath)) {
+      fs.unlinkSync(resume.filePath);
+    }
+
+    await Resume.findByIdAndDelete(resumeId);
+
+    res.json({ success: true, data: { deletedId: resumeId } });
+  } catch (error) {
+    console.error('❌ deleteResumeById Error:', error);
+    res.status(500).json({ success: false, error: 'Internal Server Error' });
+  }
+};
+
 // ✅ GET ONE: Detailed analysis view
 const getResume = async (req, res) => {
   try {
@@ -212,4 +238,4 @@ const listResumes = async (req, res) => {
   }
 };
 
-module.exports = { uploadResume, analyzeResumeById, getResume, listResumes };
+module.exports = { uploadResume, analyzeResumeById, getResume, listResumes, deleteResumeById };

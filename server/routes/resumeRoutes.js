@@ -6,6 +6,7 @@ const {
   analyzeResumeById,
   getResume,
   listResumes,
+  deleteResumeById,
 } = require('../controllers/resumeController');
 
 const multer = require('multer');
@@ -25,5 +26,8 @@ router.post('/analyze/:resumeId', analyzeResumeById);
 
 // ✅ GET ONE
 router.get('/:resumeId', getResume);
+
+// ✅ DELETE
+router.delete('/:resumeId', deleteResumeById);
 
 module.exports = router;
