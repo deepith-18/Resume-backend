@@ -34,13 +34,15 @@ if (!fs.existsSync(uploadDir)) {
 // 7. Global Middleware
 app.use(helmet());
 
+// In server.js
 app.use(cors({
   origin: [
     'http://127.0.0.1:5500', 
     'http://localhost:5500', 
-    'https://aireumeanalyze.netlify.app' // ✅ Your Netlify URL
+    'http://localhost:3000',
+    'https://aireumeanalyze.netlify.app'
   ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Added OPTIONS for preflight
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
